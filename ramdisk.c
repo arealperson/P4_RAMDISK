@@ -1,11 +1,6 @@
 /*
   FUSE: Filesystem in Userspace
-  Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
-  Copyright (C) 2011       Sebastian Pipping <sebastian@pipping.org>
-
-  This program can be distributed under the terms of the GNU GPL.
-  See the file COPYING.
-
+  
   gcc -Wall ramdisk.c `pkg-config fuse --cflags --libs` -o ramdisk
 
   gcc -std=c99 -Wall -pedantic postmark.c -o postmark
@@ -30,7 +25,9 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <stdlib.h>
-
+/*
+Data Structure to hold the file system
+*/
 struct fileSystem{
 	char *filePath;
 	struct filesStruct *head;
@@ -53,6 +50,7 @@ int saveFile = -1;
 int writeMemory = 0;
 int debug = 0;
 
+/* checks if the path exists and assigns permission */
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
 	struct fileSystem *tempFiles = NULL;
@@ -109,12 +107,13 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 	return response;
 }
 
+/* Opens a directory*/
 static int ram_opendir(const char *path, struct fuse_file_info *fi)
 {
-
 	return 0;
 }
 
+/* Directory Listing */
 static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		       off_t offset, struct fuse_file_info *fi)
 {
@@ -167,6 +166,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	return 0;
 }
 
+/* Create a Directory */
 static int xmp_mkdir(const char *path, mode_t mode)
 {
 	/*printf("<<m>> Path in mkdir is %s\n",path);*/
@@ -243,6 +243,7 @@ static int xmp_mkdir(const char *path, mode_t mode)
 	return 0;
 }
 
+/* To remove temp files create while using vi editor */
 static int xmp_unlink(const char *path)
 {
 	/*printf(">>>>>> Unlink was called with %s \n",path);*/
@@ -318,6 +319,7 @@ static int xmp_unlink(const char *path)
 	return 0;
 }
 
+/* To delete a directory and sum dirctories */
 static int xmp_rmdir(const char *path){
 	/*printf("Remove was called with path %s\n",path);*/
 
@@ -392,6 +394,7 @@ static int xmp_rmdir(const char *path){
 	return 0;
 }
 
+/* When file is opened */
 static int xmp_open(const char *path, struct fuse_file_info *fi)
 {
 	/*printf("<<o>> Open is Called with path %s\n",path);*/
@@ -440,6 +443,7 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 	else
 		return -ENOENT;
 }
+
 struct filesStruct *getReadNode(const char *path){
 	char *dirPath, *pathPtr;
 	int i,charcount = 0,  found = -1;
@@ -482,6 +486,8 @@ struct filesStruct *getReadNode(const char *path){
 	free(dirPath);
 	return dirList;
 }
+
+/* read from a file, bytes can be specified */
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 		    struct fuse_file_info *fi)
 {
@@ -522,6 +528,7 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 	return size;
 }
 
+/* Write to a file */
 static int xmp_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi){
 
@@ -564,9 +571,6 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 			}
 		}
 	}
-	/*printf("\t\t<<w>> The buf is %s\n",buf);
-	printf("\t\t<<w>> offset %zu\n",offset);
-	printf("\t\t<<w>> Size is %zu\n",size);*/
 
 	if(dirList->content == NULL){
 		signed int len = strlen(buf);
@@ -583,8 +587,6 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 		dirList->content = temp;
 		totalMemory = totalMemory - size;
 		writeMemory = writeMemory + size;
-		/*printf("NEW WRITE: Total memory after write %d\n",totalMemory);
-		printf("Write memory in after write %d\t%s\n",writeMemory,path);*/
 	}else {
 		 int newSize = offset + size;
 		 int len = strlen(dirList->content);
@@ -607,17 +609,8 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 			temp[len] = '\0';
 			free(dirList->content);
 			dirList->content = temp;
-			 /*int curSize = strlen(dirList->content);
-			printf("CURSIZE content %d\n",len);
-			 int oldTotal = totalMemory;
-			printf("OLD TOTAL: old total is %d\n",totalMemory);
-			if(curSize < 0)
-				totalMemory = totalMemory + curSize;
-			else*/
 			totalMemory = totalMemory + len - (offset+size);
 			writeMemory = writeMemory + offset + size - len;
-			/*printf("APPEND WRITE: Total memory after write %d\tramsize=%d\tdifference=%d\n",totalMemory,ramSize,diff);
-			printf("Write memory in after write %d\t%s\n",writeMemory,path);*/
 		}
 		int i,j=0;
 		for(i=offset;i<(offset+size);i++){
@@ -626,11 +619,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 		}
 		dirList->content[i] = '\0';
 	}
-	/*printf("Total memory after write %d\n",totalMemory);*/
-
-
 	free(dirPath);
-	/*printf("\t\tReturning from write %zu\n",size);*/
 	return size;
 }
 
@@ -639,25 +628,19 @@ static int ram_truncate (const char * path , off_t offset){
 	return 0;
 }
 
+/* To create a new file */
 static int ram_create(const char *path , mode_t mode, struct fuse_file_info *fi){
-	/*printf("Create was called \n");
-	printf("<<c>> Mode is %d\n",mode);*/
-	/*createFile(path);*/
 	char *dirPath, *pathPtr, *dirName;
 
 	struct filesStruct *parent;
 	int i,charcount = 0,  found = -1;
 	dirPath = strdup(path);
-	/*printf("<<c>> Create path %s\n",dirPath);*/
 	struct filesStruct *dirList = ramfiles->head;
 	int dirSize = sizeof(struct filesStruct);
-	/*printf("Check size\n");*/
 	int diffSize = totalMemory - dirSize;
-	/*printf("Different size %d",diffSize);*/
 	if(diffSize < 0){
 		fprintf(stderr,"%s","NO ENOUGH SPACE");
 		return -ENOSPC;
-		/*exit(-ENOSPC);*/
 	}
 	struct filesStruct *addFile = (struct filesStruct *)malloc(sizeof(struct filesStruct));
 	addFile->isfile = 1;
@@ -701,8 +684,6 @@ static int ram_create(const char *path , mode_t mode, struct fuse_file_info *fi)
 				}else
 					break;
 			}else{
-				/*printf("<<m>> Current directory %s\n",parent->name);
-				printf("<<m>> New directory %s\n",dirName);*/
 				dirList = parent->subdir;
 				addFile->name = strdup(dirName);
 				if(dirList == NULL){
@@ -870,8 +851,6 @@ struct filesStruct *findPath(const char *source,int retPrev){
 			prev = dirList;
 			dirList = dirList->next;
 		}
-		/*printf("The prev unlink has filename is %s\n",prev->name);
-		printf("The unlink has filename is %s\n",dirList->name);*/
 	}else{
 		while(pathPtr != NULL){
 			while(dirList != NULL){
@@ -893,8 +872,6 @@ struct filesStruct *findPath(const char *source,int retPrev){
 					break;
 			}
 		}
-		/*printf("The prev unlink has filename is %s\n",prev->name);
-		printf("The unlink has filename is %s\n",dirList->name);*/
 	}
 	if(retPrev == 1)
 		return prev;
@@ -905,20 +882,16 @@ struct filesStruct *findPath(const char *source,int retPrev){
 	return NULL;
 }
 
+/* Change the file name */
 static int ram_rename(const char *source, const char *dest){
 
-	/*printf("rename was called \n");*/
 	char *dirPath;
 	int i,charcount = 0;
 	dirPath = strdup(source);
 
-	/*printf("Source path=%s\tdest path=%s\n",source,dest);*/
 	struct filesStruct *dirList = findPath(source,0);
 	struct filesStruct *prev = findPath(source,1);
-	/*printf("found dirName is %s\n",dirList->name);
-	printf("found prev is %s\n",prev->name);*/
-
-
+	
 	for(i=0;dirPath[i]; i++) {
 		if(dirPath[i] == '/') {
 			charcount ++;
@@ -948,8 +921,6 @@ static int ram_rename(const char *source, const char *dest){
 	/*dirPath = strdup(dest);*/
 	struct filesStruct *destDirList = findPath(dest,0);
 	struct filesStruct *destPrev = findPath(dest,1);
-	/*printf("\n\tfound dest dirName is %s\n",destDirList->name);
-	printf("\n\tfound dest prev is %s\n\n",destPrev->name);*/
 
 	if(dirList->isfile == 0){
 		if(strcmp(destPrev->name,destDirList->name)==0){
@@ -977,6 +948,7 @@ static int ram_rename(const char *source, const char *dest){
 	return 0;
 }
 
+/* Saves the filesystem in memory to a file in hard disk */
 int storeDir(struct filesStruct *parent,struct filesStruct *dirList, int level, int fd,int offset){
 
 	char dir[10],dirStruct[10000];
@@ -1020,16 +992,15 @@ int storeDir(struct filesStruct *parent,struct filesStruct *dirList, int level, 
 	return offset;
 }
 
+/* Free the memory of files when the files are removed */
 void freeFiles(struct filesStruct *dirList){
-	/*struct filesStruct *prev = NULL;*/
-	/*printf("Total memory in freefiles write %d\n",totalMemory);*/
+
 	int dirSize = 0;
 	while(dirList != NULL){
 		if(dirList->subdir != NULL)
 			freeFiles(dirList->subdir);
 
 		if(dirList->isfile == 1){
-			/*printf("dirList->name\t%s\n",dirList->name);*/
 			int length=0;
 			if(dirList->content != NULL)
 				length = strlen(dirList->content);
@@ -1049,12 +1020,10 @@ void freeFiles(struct filesStruct *dirList){
 		free(dirList);
 		dirList = dirList->next;
 	}
-	/*printf("Total memory in after freefiles %d\n",totalMemory);*/
 }
 
+/* Remove the path */
 void ram_destroy (void *destroy){
-	/*printf("destroy was called\n");
-	printf("\twrite= %d\ttotal=%d\n",writeMemory,totalMemory);*/
 	if(saveFile == 1){
 		struct filesStruct *temp = ramfiles->head;
 		int fd = open(mountPoint,O_WRONLY|O_CREAT,S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP);
@@ -1065,6 +1034,7 @@ void ram_destroy (void *destroy){
 	freeFiles(dirList);
 }
 
+/* returns the index the char */
 int match(char *a, char *b)
 {
    int position = 0;
@@ -1096,6 +1066,7 @@ int match(char *a, char *b)
       return -1;
 }
 
+/* Extract the substring */
 char *substring(char *string, int position, int length)
 {
 	int c;
@@ -1113,9 +1084,9 @@ char *substring(char *string, int position, int length)
    return pointer;
 }
 
+/* Load the filesystem in disk to memory */
 int parseandload(struct filesStruct *parent,struct filesStruct *child,char *loaddir,int level){
 
-	/*printf("Entering parser\n");*/
 	int start = 0,end = 0;
 	int hasChild = -1;
 	char *nodeName,*localdir,*contentVal;
@@ -1126,28 +1097,18 @@ int parseandload(struct filesStruct *parent,struct filesStruct *child,char *load
 
 	start = match(localdir,"#node#");
 	end = match(localdir,"#endnode#");
-	/*printf("\nstart=%d\tend=%d\ttotal=%d\n",start,end,strlen(localdir));*/
 	while(start != -1 || end != -1){
 		int remLength;
 		int subsize = end - (start + strlen("#node#"));
 		filePtr = (substring(localdir,start + strlen("#node#")+1,subsize));
 		nodeptr = strdup(filePtr);
-		/*printf("after dup\n");
-		printf("\n\tNode>>%s\n",nodeptr);*/
 		struct filesStruct *addNode = (struct filesStruct *)malloc(sizeof(struct filesStruct));
 		nodeName = strtok(nodeptr,"|");
-		/*printf("\tNode name %s\n",nodeName);*/
 		addNode->name = strdup(nodeName);
-		/*printf("\tNode name %s\n",addNode->name);*/
 		addNode->isfile = atoi(strtok(NULL,"|"));
-		/*printf("\tisFile %d\n",addNode->isfile);*/
 		hasChild = atoi(strtok(NULL,"|"));
-		/*printf("\thasChild %d\n",hasChild);*/
 		contentVal = strtok(NULL,"|");
 		addNode->content = strdup(contentVal);
-		/*printf("\tcontent %s\n",addNode->content);
-		addNode->mode = 0755;*/
-
 		addNode->subdir = NULL;
 		addNode->next = NULL;
 		if((totalMemory - strlen(nodeName) - sizeof(struct filesStruct *)) < 0){
@@ -1190,23 +1151,20 @@ int parseandload(struct filesStruct *parent,struct filesStruct *child,char *load
 			start = match(localdir,dirstart);
 			end = match(localdir,dirend);
 			int subsize = end - (start + strlen(dirstart));
-			/*printf("\nstart=%d\tend=%d\ttotal=%d\n",start,end,strlen(localdir));*/
 			filePtr = substring(localdir,start + strlen(dirstart)+1,subsize);
-
 			parseandload(dirList,dirList->subdir,filePtr,level+1);
-
 			remLength = strlen(localdir)-(strlen(dirend) + subsize);
 			localdir = substring(localdir,end + strlen(dirend)+1,remLength);
 		}
 		start = match(localdir,"#node#");
 		end = match(localdir,"#endnode#");
 		free(nodeptr);
-		/*printf("\nstart=%d\tend=%d\ttotal=%d\n",start,end,strlen(localdir));*/
 	}
 	free(localdir);
 	return 0;
 }
 
+/* Supported Fuse calls */
 static struct fuse_operations xmp_oper = {
 	.getattr	= xmp_getattr,
 	.readdir	= xmp_readdir,
